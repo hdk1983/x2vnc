@@ -68,16 +68,20 @@ int main(int argc, char **argv)
       unlink(tmpfile);
 
       int n = 0;
+      int last_fail = 0;
       while(1)
       {
 	int status, pid;
 
 	/* limit how often we restart */
-	if(time(0) - last_fork < 1) sleep(2);
-	else n = 0;
+	int dosleep = 0;
+	if (time(0) - last_fork < 1) dosleep = 1;
+	else if (!last_fail) n = 0;
 	if (n++ == nreconnect && nreconnect > 0) exit(0);
+	if (dosleep) sleep (2);
 
 	last_fork=time(0);
+	last_fail = 0;
 	switch (pid=fork())
 	{
 	  case -1: 
@@ -91,13 +95,15 @@ int main(int argc, char **argv)
 	    while(waitpid(pid, &status, 0) < 0 && errno==EINTR);
             if(debug)
               fprintf(stderr,"Child exited with status %d\n",status);
+	    if (WIFEXITED(status) && WEXITSTATUS(status) == 100)
+	      last_fail = 1;
 	    continue;
 	}
 	break;
       }
     }
 
-    if (!ConnectToRFBServer(hostname, port)) exit(1);
+    if (!ConnectToRFBServer(hostname, port)) exit(reconnect ? 100 : 1);
   }
   
   if (!InitialiseRFBConnection(rfbsock)) exit(1);
