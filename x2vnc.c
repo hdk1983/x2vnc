@@ -97,6 +97,8 @@ int main(int argc, char **argv)
               fprintf(stderr,"Child exited with status %d\n",status);
 	    if (WIFEXITED(status) && WEXITSTATUS(status) == 100)
 	      last_fail = 1;
+	    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+	      exit(0);
 	    continue;
 	}
 	break;
