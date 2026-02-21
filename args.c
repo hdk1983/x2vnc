@@ -55,6 +55,7 @@ Bool reconnect = True;
 int nreconnect = 0;
 int requestedDepth = 0;
 float acceleration = 1.0;
+char *windowmode;
 
 char *geometry = NULL;
 
@@ -118,6 +119,7 @@ void usage()
           "              [-tunnel]\n"
           "              [-via <host>]\n"
           "              [-nreconnect n]\n"
+          "              [-windowmode geometry]\n"
           " Known extensions:"
 #ifdef HAVE_XINERAMA
           " Xinerama"
@@ -263,6 +265,9 @@ void processArgs(int argc, char **argv)
         } else if (strcmp(argv[i],"-nreconnect") == 0) {
           if (++i >= argc) usage();
           nreconnect = atoi(argv[i]);
+        } else if (strcmp(argv[i],"-windowmode") == 0) {
+          if (++i >= argc) usage();
+	  windowmode = argv[i];
         } else if (strcmp(argv[i],"-listen") == 0) {
           if (argumentSpecified) usage();
           

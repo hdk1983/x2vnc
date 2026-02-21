@@ -80,6 +80,7 @@ extern Bool trimsel;
 extern Bool resurface;
 extern Bool reconnect;
 extern int nreconnect;
+extern char *windowmode;
 extern int temp_file_fd;
 
 extern int noblank;

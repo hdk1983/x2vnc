@@ -335,6 +335,21 @@ Bool CreateXWindow(void)
     case EDGE_NORTH: topLevelWidth=displayWidth;
       break;
   }
+  if(windowmode) {
+    topLevelWidth=displayWidth;
+    topLevelHeight=displayHeight;
+    wmHints.x=0;
+    wmHints.y=0;
+    int x;
+    int y;
+    unsigned int w;
+    unsigned int h;
+    int mask=XParseGeometry(windowmode,&x,&y,&w,&h);
+    if(mask&WidthValue) topLevelWidth=w;
+    if(mask&HeightValue) topLevelHeight=h;
+    if(mask&XValue) wmHints.x=mask&XNegative?displayWidth+x-w:x;
+    if(mask&YValue) wmHints.y=mask&YNegative?displayHeight+y-h:y;
+  }
   
   wmHints.flags = PMaxSize | PMinSize |PPosition |PBaseSize;
   
@@ -368,8 +383,10 @@ Bool CreateXWindow(void)
 		      KeyPressMask|
 		      KeyReleaseMask|
 		      EnterWindowMask|
+		      FocusChangeMask|
 		      (resurface?VisibilityChangeMask:0) );
   
+  if(!windowmode)
   attr.override_redirect=1;
 
   topLevel = XCreateWindow(dpy, DefaultRootWindow(dpy), wmHints.x, wmHints.y,
@@ -377,7 +394,7 @@ Bool CreateXWindow(void)
 			   InputOutput, CopyFromParent,
 			   (CWBorderPixel|
 			    CWEventMask|
-			    CWOverrideRedirect|
+			    (windowmode?0:CWOverrideRedirect)|
 			    CWBackPixel),
 			   &attr);
 
@@ -385,6 +402,7 @@ Bool CreateXWindow(void)
   number_of_desktops_atom = XInternAtom(dpy, "_NET_NUMBER_OF_DESKTOPS", False);
 
 #if 1
+  if(!windowmode)
   {
     Atom t = XInternAtom(dpy, "_NET_WM_WINDOW_DOCK", False);
 
@@ -590,6 +608,7 @@ void WiggleMouse(void)
 
 void doWarp(void)
 {
+  if(windowmode) return;
   if(grabbed)
   {
     if(next_origo) return;
@@ -733,6 +752,7 @@ static void grabit(int x, int y, int state)
     hidden=0;
   }
 
+  if(!windowmode)
   XGrabPointer(dpy, topLevel, True,
 	       PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
 	       GrabModeAsync, GrabModeAsync,
@@ -790,6 +810,7 @@ static void ungrabit(int x, int y, Window warpWindow)
     XFlush(dpy);
   }
   XUngrabKeyboard(dpy, CurrentTime);
+  if(!windowmode)
   XUngrabPointer(dpy, CurrentTime);
   mouseOnScreen = warpWindow == DefaultRootWindow(dpy);
   XFlush(dpy);
@@ -1041,6 +1062,7 @@ static Bool HandleTopLevelEvent(XEvent *ev)
     case EnterNotify:
       if(!grabbed && ev->xcrossing.mode==NotifyNormal)
       {
+	if(!windowmode)
 	grabit(enter_translate(EW,displayWidth ,XROOT(ev->xcrossing)),
 	       enter_translate(NS,displayHeight,YROOT(ev->xcrossing)),
 	       ev->xcrossing.state);
@@ -1055,6 +1077,11 @@ static Bool HandleTopLevelEvent(XEvent *ev)
         Window warpWindow;
 	struct coord offset=mkcoord(0,0);
 
+	if(windowmode) {
+	  remote_xpos = ev->xmotion.x * si.framebufferWidth / topLevelWidth;
+	  remote_ypos = ev->xmotion.y * si.framebufferHeight / topLevelHeight;
+	  goto directmove;
+	}
 	do
 	{
 #ifdef HAVE_XF86DGA
@@ -1150,6 +1177,7 @@ static Bool HandleTopLevelEvent(XEvent *ev)
 	  ungrabit(x, y, warpWindow);
 	  return 1;
 	}else{
+	directmove:
 	  if(remote_xpos < 0) remote_xpos=0;
 	  if(remote_ypos < 0) remote_ypos=0;
 
@@ -1296,6 +1324,20 @@ static Bool HandleTopLevelEvent(XEvent *ev)
 	    exit(0);
 	}
 	break;
+
+    case FocusIn:
+      if(windowmode&&ev->xfocus.mode!=NotifyGrab&&!grabbed) {
+	grabit(saved_remote_xpos, saved_remote_ypos, 0);
+	break;
+      }
+      break;
+    case FocusOut:
+      if(windowmode&&ev->xfocus.mode!=NotifyGrab&&grabbed){
+	saved_remote_xpos=remote_xpos;
+	saved_remote_ypos=remote_ypos;
+	ungrabit(saved_xpos,saved_ypos,DefaultRootWindow(dpy));
+      }
+      break;
     }
 
     return True;
@@ -1387,6 +1429,7 @@ static Bool HandleRootEvent(XEvent *ev)
       {
 	saved_xpos=XROOT(ev->xkey);
 	saved_ypos=YROOT(ev->xkey);
+	if(!windowmode)
 	grabit(saved_remote_xpos, saved_remote_ypos, 0);
       }
       break;
@@ -1451,6 +1494,7 @@ static Bool HandleRootEvent(XEvent *ev)
        */
       if(grab && ev->xcrossing.mode == NotifyNormal)
       {
+	if(!windowmode)
 	grabit(enter_translate(EW,displayWidth ,XROOT(ev->xcrossing)),
 	       enter_translate(NS,displayHeight,YROOT(ev->xcrossing)),
 	       ev->xcrossing.state);
